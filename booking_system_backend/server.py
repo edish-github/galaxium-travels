@@ -5,20 +5,30 @@ import httpx
 from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi_mcp import FastApiMCP
 from sqlalchemy.orm import Session
 
 from db import get_db, init_db
 from schemas import (
+    BaggageCalculationOut,
+    BaggageCalculationRequest,
     BookingOut,
     BookingRequest,
     ErrorResponse,
     FlightOut,
+    LoyaltyAccountOut,
+    LoyaltyEnrollRequest,
+    LoyaltyTransactionOut,
+    PerksSummaryOut,
+    SeatUpgradeOut,
+    SeatUpgradeRequest,
     UserOut,
     UserRegistration,
 )
 from seed import seed
-from services import booking, flight, user
+from services import booking, flight, loyalty, perks, upgrade, user
+
 
 # Load environment variables from .env file
 load_dotenv()
@@ -328,6 +338,68 @@ async def release_hold(hold_id: str):
             return response.json()
         except httpx.HTTPError as e:
             return {"error": f"Failed to release hold: {e!s}"}
+
+
+# ==================== LOYALTY & UPGRADE ENDPOINTS ====================
+
+@app.post("/loyalty/enroll", response_model=LoyaltyAccountOut | ErrorResponse, tags=["Loyalty"])
+def enroll_loyalty(payload: LoyaltyEnrollRequest, db: Session = Depends(get_db)):
+    """Enroll a user in the Galaxium Loyalty Program."""
+    result = loyalty.enroll_user(db, payload.user_id)
+    if isinstance(result, ErrorResponse):
+        return JSONResponse(status_code=400, content=result.model_dump())
+    return result
+
+
+@app.get("/loyalty/{user_id}", response_model=LoyaltyAccountOut | ErrorResponse, tags=["Loyalty"])
+def get_loyalty_account(user_id: int, db: Session = Depends(get_db)):
+    """Get loyalty account information for a user."""
+    result = loyalty.get_loyalty_account(db, user_id)
+    if isinstance(result, ErrorResponse):
+        return JSONResponse(status_code=404, content=result.model_dump())
+    return result
+
+
+@app.get("/loyalty/{user_id}/transactions", response_model=list[LoyaltyTransactionOut] | ErrorResponse, tags=["Loyalty"])
+def get_loyalty_transactions(user_id: int, db: Session = Depends(get_db)):
+    """Get miles transaction history for a user."""
+    result = loyalty.get_transactions(db, user_id)
+    if isinstance(result, ErrorResponse):
+        return JSONResponse(status_code=404, content=result.model_dump())
+    return result
+
+
+@app.get("/loyalty/{user_id}/perks", response_model=PerksSummaryOut | ErrorResponse, tags=["Loyalty"])
+def get_user_perks(user_id: int, db: Session = Depends(get_db)):
+    """Get active tier perks (lounge access, boarding group, discounts) for a user."""
+    account_result = loyalty.get_loyalty_account(db, user_id)
+    if isinstance(account_result, ErrorResponse):
+        return JSONResponse(status_code=404, content=account_result.model_dump())
+    return perks.get_tier_perks(account_result.tier)
+
+
+@app.post("/loyalty/baggage/calculate", response_model=BaggageCalculationOut | ErrorResponse, tags=["Loyalty"])
+def calculate_baggage_fee(payload: BaggageCalculationRequest, db: Session = Depends(get_db)):
+    """Calculate baggage allowance and fees according to seat class and tier."""
+    result = perks.calculate_baggage(db, payload.user_id, payload.seat_class, payload.number_of_bags)
+    if isinstance(result, ErrorResponse):
+        return JSONResponse(status_code=400, content=result.model_dump())
+    return result
+
+
+@app.post("/bookings/{booking_id}/upgrade", response_model=SeatUpgradeOut | ErrorResponse, tags=["Bookings"])
+def upgrade_booking(booking_id: int, payload: SeatUpgradeRequest, db: Session = Depends(get_db)):
+    """Upgrade a flight booking seat class using loyalty miles."""
+    result = upgrade.upgrade_seat_with_miles(
+        db,
+        booking_id=booking_id,
+        user_id=payload.user_id,
+        name=payload.name,
+        target_class=payload.target_class,
+    )
+    if isinstance(result, ErrorResponse):
+        return JSONResponse(status_code=400, content=result.model_dump())
+    return result
 
 
 # ==================== MCP SERVER (for AI agents) ====================
