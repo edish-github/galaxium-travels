@@ -38,3 +38,30 @@ class Booking(Base):
     booking_time = Column(String, nullable=False)
     seat_class = Column(String, nullable=False, default='economy')  # economy/business/galaxium
     price_paid = Column(Integer, nullable=False)  # Actual price at booking time
+
+
+class LoyaltyTier(str, Enum):
+    STANDARD = "standard"
+    SILVER = "silver"
+    GOLD = "gold"
+    STARLIGHT = "starlight"
+
+
+class LoyaltyAccount(Base):
+    __tablename__ = 'loyalty_accounts'
+    account_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.user_id'), unique=True, nullable=False)
+    tier = Column(String, nullable=False, default=LoyaltyTier.STANDARD.value)
+    miles_balance = Column(Integer, nullable=False, default=0)
+    lifetime_miles = Column(Integer, nullable=False, default=0)
+    enrolled_at = Column(String, nullable=False)
+
+
+class LoyaltyTransaction(Base):
+    __tablename__ = 'loyalty_transactions'
+    transaction_id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.user_id'), nullable=False)
+    transaction_type = Column(String, nullable=False)  # 'accrual', 'redemption', 'bonus'
+    miles = Column(Integer, nullable=False)
+    description = Column(String, nullable=False)
+    created_at = Column(String, nullable=False)

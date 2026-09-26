@@ -85,3 +85,79 @@ class ErrorResponse(BaseModel):
     error: str
     error_code: str
     details: str | None = None
+
+
+# Loyalty schemas
+LoyaltyTierName = Literal['standard', 'silver', 'gold', 'starlight']
+
+
+class LoyaltyEnrollRequest(BaseModel):
+    user_id: int
+
+
+class LoyaltyAccountOut(BaseModel):
+    account_id: int
+    user_id: int
+    tier: str
+    miles_balance: int
+    lifetime_miles: int
+    enrolled_at: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class LoyaltyTransactionOut(BaseModel):
+    transaction_id: int
+    user_id: int
+    transaction_type: str
+    miles: int
+    description: str
+    created_at: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MilesRedeemRequest(BaseModel):
+    user_id: int
+    miles: int
+    description: str
+
+
+class BaggageCalculationRequest(BaseModel):
+    user_id: int
+    seat_class: SeatClass
+    number_of_bags: int
+
+
+class BaggageCalculationOut(BaseModel):
+    user_id: int
+    tier: str
+    seat_class: str
+    free_bags_allowed: int
+    charged_bags: int
+    baggage_fee: int
+
+
+class PerksSummaryOut(BaseModel):
+    tier: str
+    lounge_access: bool
+    priority_boarding_group: str
+    free_checked_bags: int
+    discount_percentage: int
+
+
+class SeatUpgradeRequest(BaseModel):
+    user_id: int
+    name: str
+    target_class: Literal['business', 'galaxium']
+
+
+class SeatUpgradeOut(BaseModel):
+    booking_id: int
+    user_id: int
+    flight_id: int
+    previous_class: str
+    new_class: str
+    miles_deducted: int
+    status: str
+
